@@ -1,4 +1,5 @@
 package com.ndsu.cs;
+
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
@@ -85,8 +86,8 @@ public class RequestHandler extends Thread {
          * (4) Write the web server's response to a cache file, put the request URL and cache file name to the cache Map
          * (5) close file, and sockets.
          */
-        return false;
 
+        return true;
     }
 
 

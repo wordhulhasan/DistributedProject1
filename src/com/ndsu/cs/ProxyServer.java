@@ -24,13 +24,17 @@ public class ProxyServer {
     ServerSocket proxySocket;
 
     String logFileName = "log.txt";
-
+    ProxyServer server;
     public static void main(String[] args) {
+        System.out.println(args.length);
+        if(args.length!=1){
+            throw new IllegalArgumentException("Insufficient Arguments");
+        }
         new ProxyServer().startServer(Integer.parseInt(args[0]));
     }
 
     void startServer(int proxyPort) {
-
+        System.out.println("Server started on port: " +proxyPort);
         cache = new ConcurrentHashMap<>();
 
         // create the directory to store cached files.
@@ -46,6 +50,14 @@ public class ProxyServer {
          * remember to catch Exceptions!
          *
          */
+        try{
+            proxySocket = new ServerSocket(proxyPort);
+            while (true){
+                new RequestHandler(proxySocket.accept(), new ProxyServer());
+            }
+        }catch (Exception e){
+            System.out.println(e.toString());
+        }
 
 
     }

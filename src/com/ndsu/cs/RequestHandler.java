@@ -1,10 +1,13 @@
 package com.ndsu.cs;
+
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 // RequestHandler is thread that process requests of one client connection
@@ -36,7 +39,7 @@ public class RequestHandler extends Thread implements Runnable {
         this.server = proxyServer;
 
         try {
-            clientSocket.setSoTimeout(15000);
+            clientSocket.setSoTimeout(2000);
             inFromClient = clientSocket.getInputStream();
             outToClient = clientSocket.getOutputStream();
 
@@ -45,7 +48,6 @@ public class RequestHandler extends Thread implements Runnable {
         }
 
     }
-
 
     @Override
 
@@ -66,21 +68,22 @@ public class RequestHandler extends Thread implements Runnable {
         proxyToClientBufferedReader = new BufferedReader(new InputStreamReader(inFromClient));
         proxyToClientBufferedWriter = new BufferedWriter(new OutputStreamWriter(outToClient));
 
-        while(true){
+        while (true) {
             try {
                 userInput = proxyToClientBufferedReader.readLine();
-                while(!(userInput.isEmpty())){
-//                    System.out.println("Received Messaged from "+ Thread.currentThread().getName()+" : "+ userInput);
+                while (!(userInput.isEmpty())) {
                     System.out.println(userInput);
+
                     userInput = proxyToClientBufferedReader.readLine();
-                    proxyToClientBufferedWriter.write("You entered : "+ userInput);
+                    proxyToClientBufferedWriter.write("You entered : " + userInput);
                     proxyToClientBufferedWriter.newLine();
                     proxyToClientBufferedWriter.flush();
-                } ;
+                }
+                ;
             } catch (IOException e) {
                 e.printStackTrace();
-            }catch (Exception ex){
-                System.out.println("Exception in Thread Run. Exception: "+ex);
+            } catch (Exception ex) {
+                System.out.println("Exception in Thread Run. Exception: " + ex);
             }
 
         }
@@ -113,7 +116,6 @@ public class RequestHandler extends Thread implements Runnable {
         return false;
 
     }
-
 
 
     // Sends the cached content stored in the cache file to the client
@@ -154,6 +156,19 @@ public class RequestHandler extends Thread implements Runnable {
             sb.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
         }
         return sb.toString();
+    }
+
+    public String parseUrl(String line) {
+        Pattern p = Pattern.compile(Pattern.quote("GET ") + "(.*?)" + Pattern.quote(" HTTP/"));
+        Matcher m = p.matcher(line);
+
+        String url = "";
+
+        while (m.find()) {
+            url =  m.group(1);
+        }
+
+        return url;
     }
 
 }

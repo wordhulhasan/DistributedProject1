@@ -30,7 +30,6 @@ public class RequestHandler extends Thread {
 
     public RequestHandler(Socket clientSocket, ProxyServer proxyServer) {
 
-
         this.clientSocket = clientSocket;
 
 
@@ -49,8 +48,8 @@ public class RequestHandler extends Thread {
 
 
     @Override
-
     public void run() {
+        System.out.println("The run is working");
 
         /**
          * To do
@@ -60,6 +59,35 @@ public class RequestHandler extends Thread {
          * (3) Otherwise, call method proxyServertoClient to process the GET request
          *
          */
+
+        try{
+
+            byte[] reply = new byte[4096];
+            new Thread(){
+                public void run(){
+                    int bytes_read;
+                    try {
+                        while ((bytes_read = inFromClient.read(request)) != -1){
+                            outToClient.write(request,0,bytes_read);
+                            outToClient.flush();
+                        }
+                    }catch (Exception e){
+                        System.out.println(e.toString());
+                    }
+                    try {
+                        outToClient.close();
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
+            int bytes_read;
+
+
+        }catch (Exception e)
+        {
+            System.out.println(e.toString());
+        }
 
     }
 

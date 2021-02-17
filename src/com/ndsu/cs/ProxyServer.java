@@ -1,9 +1,6 @@
 package com.ndsu.cs;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
@@ -13,7 +10,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 public class ProxyServer {
@@ -25,11 +24,11 @@ public class ProxyServer {
 
     String logFileName = "log.txt";
 
-    public static void main(String[] args) {
-        new ProxyServer().startServer(Integer.parseInt(args[0]));
+    public static void main(String[] args){
+        new ProxyServer().startServer(8081);
     }
 
-    void startServer(int proxyPort) {
+    void startServer(int proxyPort){
 
         cache = new ConcurrentHashMap<>();
 
@@ -46,8 +45,35 @@ public class ProxyServer {
          * remember to catch Exceptions!
          *
          */
+        ExecutorService executor = null;
+        try {
+            executor = Executors.newFixedThreadPool(5);
+
+            System.out.println("Waiting for clients..");
+            while(true){
+                proxySocket = new ServerSocket(proxyPort);
+                Socket proxyClientSocket = proxySocket.accept();
+                Runnable worker = new RequestHandler(proxyClientSocket, new ProxyServer());
+
+                executor.execute(worker);
+            }
 
 
+
+//            PrintWriter out = new PrintWriter(proxyClientSocket.getOutputStream(), true);
+//            BufferedReader in = new BufferedReader(new InputStreamReader((proxyClientSocket.getInputStream())));
+//            System.out.println("Client connected on port: "+ proxyPort);
+//
+//            String inputLine;
+//
+//            while((inputLine = in.readLine())!=null){
+//                System.out.println("Received Message: "+inputLine+" from "+proxyClientSocket.toString());
+//                out.println(inputLine);
+//            }
+        }catch (IOException e){
+            System.out.println("Exception caught when trying" +
+                    "to listen o port or listening for a connection!");
+        }
     }
 
 

@@ -8,7 +8,7 @@ import java.security.SecureRandom;
 
 
 // RequestHandler is thread that process requests of one client connection
-public class RequestHandler extends Thread {
+public class RequestHandler extends Thread implements Runnable {
 
 
     Socket clientSocket;
@@ -36,7 +36,7 @@ public class RequestHandler extends Thread {
         this.server = proxyServer;
 
         try {
-            clientSocket.setSoTimeout(2000);
+            clientSocket.setSoTimeout(15000);
             inFromClient = clientSocket.getInputStream();
             outToClient = clientSocket.getOutputStream();
 
@@ -59,6 +59,31 @@ public class RequestHandler extends Thread {
          * (3) Otherwise, call method proxyServertoClient to process the GET request
          *
          */
+
+        System.out.println("Thread started with name: " + Thread.currentThread().getName());
+        String userInput;
+
+        proxyToClientBufferedReader = new BufferedReader(new InputStreamReader(inFromClient));
+        proxyToClientBufferedWriter = new BufferedWriter(new OutputStreamWriter(outToClient));
+
+        while(true){
+            try {
+                userInput = proxyToClientBufferedReader.readLine();
+                while(!(userInput.isEmpty())){
+//                    System.out.println("Received Messaged from "+ Thread.currentThread().getName()+" : "+ userInput);
+                    System.out.println(userInput);
+                    userInput = proxyToClientBufferedReader.readLine();
+                    proxyToClientBufferedWriter.write("You entered : "+ userInput);
+                    proxyToClientBufferedWriter.newLine();
+                    proxyToClientBufferedWriter.flush();
+                } ;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }catch (Exception ex){
+                System.out.println("Exception in Thread Run. Exception: "+ex);
+            }
+
+        }
 
     }
 

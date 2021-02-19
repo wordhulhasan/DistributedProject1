@@ -58,18 +58,6 @@ public class ProxyServer {
                 executor.execute(worker);
             }
 
-
-
-//            PrintWriter out = new PrintWriter(proxyClientSocket.getOutputStream(), true);
-//            BufferedReader in = new BufferedReader(new InputStreamReader((proxyClientSocket.getInputStream())));
-//            System.out.println("Client connected on port: "+ proxyPort);
-//
-//            String inputLine;
-//
-//            while((inputLine = in.readLine())!=null){
-//                System.out.println("Received Message: "+inputLine+" from "+proxyClientSocket.toString());
-//                out.println(inputLine);
-//            }
         }catch (IOException e){
             System.out.println("Exception caught when trying" +
                     "to listen o port or listening for a connection!");

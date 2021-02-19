@@ -1,11 +1,15 @@
 package com.ndsu.cs;
 
+import com.oracle.tools.packager.IOUtils;
+import sun.nio.ch.IOUtil;
+
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +30,9 @@ public class RequestHandler extends Thread implements Runnable {
 
     BufferedWriter proxyToClientBufferedWriter;
 
+    BufferedReader bufReadClientRequest;
+
+    String requestString;
 
     private ProxyServer server;
 
@@ -38,12 +45,16 @@ public class RequestHandler extends Thread implements Runnable {
 
         this.server = proxyServer;
 
+
         try {
             clientSocket.setSoTimeout(2000);
             inFromClient = clientSocket.getInputStream();
             outToClient = clientSocket.getOutputStream();
+            bufReadClientRequest = new BufferedReader(new InputStreamReader(inFromClient));
 
-        } catch (Exception e) {
+
+
+        } catch (IOException e) {
             e.printStackTrace();
         }
 
@@ -61,35 +72,21 @@ public class RequestHandler extends Thread implements Runnable {
          * (3) Otherwise, call method proxyServertoClient to process the GET request
          *
          */
-
-        System.out.println("Thread started with name: " + Thread.currentThread().getName());
-        String userInput;
-
-        proxyToClientBufferedReader = new BufferedReader(new InputStreamReader(inFromClient));
-        proxyToClientBufferedWriter = new BufferedWriter(new OutputStreamWriter(outToClient));
-
         while (true) {
+
             try {
-                userInput = proxyToClientBufferedReader.readLine();
-                while (!(userInput.isEmpty())) {
-                    System.out.println(userInput);
+                requestString = bufReadClientRequest.readLine();
+                    if (requestString.contains("GET")) {
+                        System.out.println("From client to Proxy");
+                        proxyServertoClient(request);
+                    }
 
-                    userInput = proxyToClientBufferedReader.readLine();
-                    proxyToClientBufferedWriter.write("You entered : " + userInput);
-                    proxyToClientBufferedWriter.newLine();
-                    proxyToClientBufferedWriter.flush();
-                }
-                ;
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (Exception ex) {
-                System.out.println("Exception in Thread Run. Exception: " + ex);
             }
-
+        catch(IOException e){
+            System.out.println(e);
         }
-
     }
-
+    }
 
     private boolean proxyServertoClient(byte[] clientRequest) {
 
@@ -108,11 +105,53 @@ public class RequestHandler extends Thread implements Runnable {
         /**
          * To do
          * (1) Create a socket to connect to the web server (default port 80)
-         * (2) Send client's request (clientRequest) to the web server, you may want to use fluch() after writing.
+         * (2) Send client's request (clientRequest) to the web server, you may want to use flush() after writing.
          * (3) Use a while loop to read all responses from web server and send back to client
          * (4) Write the web server's response to a cache file, put the request URL and cache file name to the cache Map
          * (5) close file, and sockets.
          */
+        String host = parseUrl(requestString);
+        System.out.println(host);
+        int remotePort = 80;
+        try{
+            serverSocket = new Socket("www.cs.ndsu.nodak.edu", remotePort);
+
+            outToServer = serverSocket.getOutputStream();
+
+            int byteRead;
+            while((byteRead = inFromClient.read(request)) != -1){
+                System.out.println("Request from Client to Proxy Server");
+                outToServer.write(request, 0, byteRead);
+                outToServer.flush();
+            }
+        }catch (IOException e){
+            System.out.println(e);
+        }
+
+        int bytesRead;
+        try{
+            assert serverSocket != null;
+            inFromServer = serverSocket.getInputStream();
+            while((bytesRead = inFromServer.read(serverReply)) != -1){
+                System.out.println("Getting response from Real Server");
+                outToClient.write(serverReply, 0, bytesRead);
+                outToClient.flush();
+            }
+        }catch (IOException e){
+
+        }finally {
+            try{
+                if (serverSocket != null){
+                    serverSocket.close();
+                }
+                if(clientSocket !=null){
+                    clientSocket.close();
+                }
+            }catch (IOException e){
+                System.out.println(e);
+            }
+        }
+
         return false;
 
     }

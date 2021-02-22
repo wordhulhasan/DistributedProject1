@@ -64,8 +64,6 @@ public class ProxyServer {
         }
     }
 
-
-
     public String getCache(String hashcode) {
         return cache.get(hashcode);
     }

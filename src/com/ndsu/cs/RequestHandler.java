@@ -5,6 +5,7 @@ import sun.nio.ch.IOUtil;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
@@ -15,7 +16,7 @@ import java.util.regex.Pattern;
 
 
 // RequestHandler is thread that process requests of one client connection
-public class RequestHandler extends Thread implements Runnable {
+public class RequestHandler implements Runnable {
 
 
     Socket clientSocket;
@@ -36,6 +37,8 @@ public class RequestHandler extends Thread implements Runnable {
 
     private ProxyServer server;
 
+    StringBuffer serverResponse = new StringBuffer();
+
 
     public RequestHandler(Socket clientSocket, ProxyServer proxyServer) {
 
@@ -47,11 +50,10 @@ public class RequestHandler extends Thread implements Runnable {
 
 
         try {
-            clientSocket.setSoTimeout(2000);
+            clientSocket.setSoTimeout(15000);
             inFromClient = clientSocket.getInputStream();
             outToClient = clientSocket.getOutputStream();
             bufReadClientRequest = new BufferedReader(new InputStreamReader(inFromClient));
-
 
 
         } catch (IOException e) {
@@ -61,7 +63,6 @@ public class RequestHandler extends Thread implements Runnable {
     }
 
     @Override
-
     public void run() {
 
         /**
@@ -72,23 +73,23 @@ public class RequestHandler extends Thread implements Runnable {
          * (3) Otherwise, call method proxyServertoClient to process the GET request
          *
          */
-        while (true) {
-
-            try {
+        try {
+            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outToClient));
+            while (true) {
                 requestString = bufReadClientRequest.readLine();
-                    if (requestString.contains("GET")) {
-                        System.out.println("From client to Proxy");
-                        proxyServertoClient(request);
-                    }
+                if (requestString != null && requestString.contains("GET")) {
+                    proxyServertoClient(requestString);
 
+                } else {
+                }
             }
-        catch(IOException e){
-            System.out.println(e);
+        } catch (IOException e) {
+            System.out.println("Error");
         }
     }
-    }
 
-    private boolean proxyServertoClient(byte[] clientRequest) {
+
+    private void proxyServertoClient(String requestString) throws IOException {
 
         FileOutputStream fileWriter = null;
         Socket serverSocket = null;
@@ -101,6 +102,8 @@ public class RequestHandler extends Thread implements Runnable {
         // to handle binary content, byte is used
         byte[] serverReply = new byte[4096];
 
+        URL treatURL;
+
 
         /**
          * To do
@@ -110,49 +113,74 @@ public class RequestHandler extends Thread implements Runnable {
          * (4) Write the web server's response to a cache file, put the request URL and cache file name to the cache Map
          * (5) close file, and sockets.
          */
-        String host = parseUrl(requestString);
-        System.out.println(host);
+        String urlString = parseUrl(requestString);
+        System.out.println(urlString);
         int remotePort = 80;
-        try{
-            serverSocket = new Socket("www.cs.ndsu.nodak.edu", remotePort);
+        InetAddress address = InetAddress.getByName(new URL(urlString).getHost());
+        try {
+            serverSocket = new Socket(address, remotePort);
+            serverSocket.setSoTimeout(30000);
+
+            URL remoteURL = new URL(urlString);
+            HttpURLConnection proxyToServerConnection = (HttpURLConnection)remoteURL.openConnection();
+
+            int responseCode = proxyToServerConnection.getResponseCode();
+
+            if (responseCode == 200){
+                BufferedReader fromServer = new BufferedReader(new InputStreamReader(proxyToServerConnection.getInputStream()));
+
+                String input;
+                while ((input = fromServer.readLine())!=null){
+                    serverResponse.append(input);
+                }
+                fromServer.close();
+
+            }
+            System.out.println(serverResponse);
+
+            fileWriter = new FileOutputStream(fileName);
+
+            inFromServer = serverSocket.getInputStream();
+            BufferedReader bufferReaderFromServerToProxy = new BufferedReader(new InputStreamReader(inFromServer));
 
             outToServer = serverSocket.getOutputStream();
+            BufferedWriter bufferedWriterFromProxyToServer = new BufferedWriter(new OutputStreamWriter(outToServer));
 
-            int byteRead;
-            while((byteRead = inFromClient.read(request)) != -1){
-                System.out.println("Request from Client to Proxy Server");
-                outToServer.write(request, 0, byteRead);
-                outToServer.flush();
-            }
-        }catch (IOException e){
-            System.out.println(e);
-        }
 
-        int bytesRead;
-        try{
-            assert serverSocket != null;
-            inFromServer = serverSocket.getInputStream();
-            while((bytesRead = inFromServer.read(serverReply)) != -1){
-                System.out.println("Getting response from Real Server");
-                outToClient.write(serverReply, 0, bytesRead);
-                outToClient.flush();
-            }
-        }catch (IOException e){
+            fileWriter.write(serverReply);
 
-        }finally {
             try{
-                if (serverSocket != null){
-                    serverSocket.close();
+                int byteRead;
+
+                while((byteRead = inFromServer.read(serverReply)) != -1){
+                    outToClient.write(serverReply, 0, byteRead);
+                    outToClient.flush();
                 }
-                if(clientSocket !=null){
-                    clientSocket.close();
-                }
-            }catch (IOException e){
-                System.out.println(e);
+
+
+            }catch (Exception e){
+                e.printStackTrace();
             }
+
+            if (serverSocket != null){
+                serverSocket.close();
+            }
+            if(proxyToClientBufferedWriter != null){
+                proxyToClientBufferedWriter.close();
+            }
+            if(bufferedWriterFromProxyToServer != null){
+                bufferedWriterFromProxyToServer.close();
+            }
+            if(bufferReaderFromServerToProxy != null){
+                bufferReaderFromServerToProxy.close();
+            }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
-        return false;
+
 
     }
 
@@ -198,13 +226,14 @@ public class RequestHandler extends Thread implements Runnable {
     }
 
     public String parseUrl(String line) {
+        System.out.println("Line: " + line);
         Pattern p = Pattern.compile(Pattern.quote("GET ") + "(.*?)" + Pattern.quote(" HTTP/"));
         Matcher m = p.matcher(line);
 
         String url = "";
 
         while (m.find()) {
-            url =  m.group(1);
+            url = m.group(1);
         }
 
         return url;

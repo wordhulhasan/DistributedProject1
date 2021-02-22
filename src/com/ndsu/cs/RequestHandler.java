@@ -1,16 +1,14 @@
 package com.ndsu.cs;
 
-import com.oracle.tools.packager.IOUtils;
-import sun.nio.ch.IOUtil;
-
 import java.io.*;
-import java.net.*;
+import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -132,35 +130,36 @@ public class RequestHandler implements Runnable {
                 String input;
                 while ((input = fromServer.readLine())!=null){
                     serverResponse.append(input);
+                    outToClient.write(input.getBytes(StandardCharsets.UTF_8));
+                    outToClient.flush();
                 }
                 fromServer.close();
 
             }
-            System.out.println(serverResponse);
 
-            fileWriter = new FileOutputStream(fileName);
-
-            inFromServer = serverSocket.getInputStream();
-            BufferedReader bufferReaderFromServerToProxy = new BufferedReader(new InputStreamReader(inFromServer));
-
-            outToServer = serverSocket.getOutputStream();
-            BufferedWriter bufferedWriterFromProxyToServer = new BufferedWriter(new OutputStreamWriter(outToServer));
-
-
-            fileWriter.write(serverReply);
-
-            try{
-                int byteRead;
-
-                while((byteRead = inFromServer.read(serverReply)) != -1){
-                    outToClient.write(serverReply, 0, byteRead);
-                    outToClient.flush();
-                }
-
-
-            }catch (Exception e){
-                e.printStackTrace();
-            }
+//            fileWriter = new FileOutputStream(fileName);
+//
+//            inFromServer = serverSocket.getInputStream();
+//            BufferedReader bufferReaderFromServerToProxy = new BufferedReader(new InputStreamReader(inFromServer));
+//
+//            outToServer = serverSocket.getOutputStream();
+//            BufferedWriter bufferedWriterFromProxyToServer = new BufferedWriter(new OutputStreamWriter(outToServer));
+//
+//
+//            fileWriter.write(serverReply);
+//
+//            try{
+//                int byteRead;
+//
+//                while((byteRead = inFromServer.read(serverReply)) != -1){
+//                    outToClient.write(serverReply, 0, byteRead);
+//                    outToClient.flush();
+//                }
+//
+//
+//            }catch (Exception e){
+//                e.printStackTrace();
+//            }
 
             if (serverSocket != null){
                 serverSocket.close();
@@ -168,12 +167,12 @@ public class RequestHandler implements Runnable {
             if(proxyToClientBufferedWriter != null){
                 proxyToClientBufferedWriter.close();
             }
-            if(bufferedWriterFromProxyToServer != null){
-                bufferedWriterFromProxyToServer.close();
-            }
-            if(bufferReaderFromServerToProxy != null){
-                bufferReaderFromServerToProxy.close();
-            }
+//            if(bufferedWriterFromProxyToServer != null){
+//                bufferedWriterFromProxyToServer.close();
+//            }
+//            if(bufferReaderFromServerToProxy != null){
+//                bufferReaderFromServerToProxy.close();
+//            }
 
 
         } catch (IOException e) {

@@ -7,10 +7,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
 
-public class ProxyServer implements Runnable{
+public class MultiThreadServer implements Runnable{
 
     public static void main(String[] args){
-        ProxyServer proxy = new ProxyServer(8081);
+        MultiThreadServer proxy = new MultiThreadServer(8081);
         proxy.listen();
     }
 
@@ -21,7 +21,7 @@ public class ProxyServer implements Runnable{
     static ArrayList<Thread> servicingThreads;
 
 
-    public ProxyServer(int port){
+    public MultiThreadServer(int port){
         cache = new HashMap<>();
         servicingThreads = new ArrayList<>();
 
@@ -106,7 +106,13 @@ public class ProxyServer implements Runnable{
     }
 
     public static File getCachedPage(String url){
-        return cache.get(url);
+        File file = null;
+        try{
+            file =  cache.get(url);
+        }catch (Exception e){
+            System.out.println("Hashmap returned null");
+        }
+        return file;
     }
 
     @Override

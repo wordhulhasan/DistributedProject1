@@ -1,241 +1,240 @@
 package com.ndsu.cs;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.HttpURLConnection;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.SecureRandom;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-
-// RequestHandler is thread that process requests of one client connection
-public class RequestHandler implements Runnable {
-
+public class RequestHandler implements Runnable{
 
     Socket clientSocket;
 
-    InputStream inFromClient;
+    BufferedReader proxyToClientBr;
 
-    OutputStream outToClient;
+    BufferedWriter proxyToClientBw;
 
-    byte[] request = new byte[1024];
+    private Thread httpClientToServer;
 
-    BufferedReader proxyToClientBufferedReader;
-
-    BufferedWriter proxyToClientBufferedWriter;
-
-    BufferedReader bufReadClientRequest;
-
-    String requestString;
-
-    private ProxyServer server;
-
-    StringBuffer serverResponse = new StringBuffer();
-
-
-    public RequestHandler(Socket clientSocket, ProxyServer proxyServer) {
-
-
+    public RequestHandler(Socket clientSocket){
         this.clientSocket = clientSocket;
 
-
-        this.server = proxyServer;
-
-
-        try {
-            clientSocket.setSoTimeout(15000);
-            inFromClient = clientSocket.getInputStream();
-            outToClient = clientSocket.getOutputStream();
-            bufReadClientRequest = new BufferedReader(new InputStreamReader(inFromClient));
-
-
-        } catch (IOException e) {
+        try{
+            this.clientSocket.setSoTimeout(5000);
+            proxyToClientBr = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            proxyToClientBw = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+        }catch (IOException e){
             e.printStackTrace();
         }
-
     }
 
     @Override
     public void run() {
 
-        /**
-         * To do
-         * Process the requests from a client. In particular,
-         * (1) Check the request type, only process GET request and ignore others
-         * (2) If the url of GET request has been cached, respond with cached content
-         * (3) Otherwise, call method proxyServertoClient to process the GET request
-         *
-         */
-        try {
-            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outToClient));
-            while (true) {
-                requestString = bufReadClientRequest.readLine();
-                if (requestString != null && requestString.contains("GET")) {
-                    proxyServertoClient(requestString);
+        String requestString;
 
-                } else {
+        try {
+            requestString = proxyToClientBr.readLine();
+        }catch (IOException e){
+            e.printStackTrace();
+            System.out.println("Error in reading request from the client");
+            return;
+        }
+
+        //parse URL
+        System.out.println("The received request is: "+ requestString);
+
+        //request type
+        String request = requestString.substring(0, requestString.indexOf(' '));
+
+        //remove request type and space
+        String urlString = requestString.substring(requestString.indexOf(' ')+1);
+
+        urlString = urlString.substring(0, urlString.indexOf(' '));
+
+        // Prepend http:// if necessary to create correct URL
+        if(!urlString.substring(0,4).equals("http")){
+            String temp = "http://";
+            urlString = temp + urlString;
+        }
+        // Check request type
+        if(request.equals("CONNECT")){
+            System.out.println("HTTPS Request for : " + urlString + "\n");
+//            handleHTTPSRequest(urlString);
+        }
+
+        else{
+            // Check if we have a cached copy
+            File file;
+            if((file = MultiThreadServer.getCachedPage(urlString)) != null){
+                System.out.println("Cached Copy found for : " + urlString + "\n");
+                sendCachedPageToClient(file);
+            } else {
+                System.out.println("HTTP GET for : " + urlString + "\n");
+                sendNonCachedToClient(urlString);
+            }
+        }
+    }
+
+    private void sendCachedPageToClient(File fileCached) {
+
+        try{
+            //send image files from cache
+            String fileExtension = fileCached.getName().substring(fileCached.getName().lastIndexOf('.'));
+
+            String cahcedResponse;
+
+            if ((fileExtension.contains(".png")) || (fileExtension.contains(".jpg")) ||
+                    (fileExtension.contains(".gif")) || (fileExtension.contains(".jpeg")) ||(fileExtension.contains(".ico"))){
+                BufferedImage image = ImageIO.read(fileCached);
+
+                if (image != null){
+                    ImageIO.write(image, fileExtension.substring(1), clientSocket.getOutputStream());
                 }
             }
-        } catch (IOException e) {
-            System.out.println("Error");
-        }
-    }
+            else {
+                BufferedReader cachedFileReader = new BufferedReader(new InputStreamReader(new FileInputStream(fileCached)));
+                String response;
 
-
-    private void proxyServertoClient(String requestString) throws IOException {
-
-        FileOutputStream fileWriter = null;
-        Socket serverSocket = null;
-        InputStream inFromServer;
-        OutputStream outToServer;
-
-        // Create Buffered output stream to write to cached copy of file
-        String fileName = "cached/" + generateRandomFileName() + ".dat";
-
-        // to handle binary content, byte is used
-        byte[] serverReply = new byte[4096];
-
-        URL treatURL;
-
-
-        /**
-         * To do
-         * (1) Create a socket to connect to the web server (default port 80)
-         * (2) Send client's request (clientRequest) to the web server, you may want to use flush() after writing.
-         * (3) Use a while loop to read all responses from web server and send back to client
-         * (4) Write the web server's response to a cache file, put the request URL and cache file name to the cache Map
-         * (5) close file, and sockets.
-         */
-        String urlString = parseUrl(requestString);
-        System.out.println(urlString);
-        int remotePort = 80;
-        InetAddress address = InetAddress.getByName(new URL(urlString).getHost());
-        try {
-            serverSocket = new Socket(address, remotePort);
-            serverSocket.setSoTimeout(30000);
-
-            URL remoteURL = new URL(urlString);
-            HttpURLConnection proxyToServerConnection = (HttpURLConnection)remoteURL.openConnection();
-
-            int responseCode = proxyToServerConnection.getResponseCode();
-
-            if (responseCode == 200){
-                BufferedReader fromServer = new BufferedReader(new InputStreamReader(proxyToServerConnection.getInputStream()));
-
-                String input;
-                while ((input = fromServer.readLine())!=null){
-                    serverResponse.append(input);
-                    outToClient.write(input.getBytes(StandardCharsets.UTF_8));
-                    outToClient.flush();
+                while((response = cachedFileReader.readLine())!=null){
+                    proxyToClientBw.write(response);
                 }
-                fromServer.close();
 
+                proxyToClientBw.flush();
+
+                if(cachedFileReader != null){
+                    cachedFileReader.close();
+                }
             }
 
-//            fileWriter = new FileOutputStream(fileName);
-//
-//            inFromServer = serverSocket.getInputStream();
-//            BufferedReader bufferReaderFromServerToProxy = new BufferedReader(new InputStreamReader(inFromServer));
-//
-//            outToServer = serverSocket.getOutputStream();
-//            BufferedWriter bufferedWriterFromProxyToServer = new BufferedWriter(new OutputStreamWriter(outToServer));
-//
-//
-//            fileWriter.write(serverReply);
-//
-//            try{
-//                int byteRead;
-//
-//                while((byteRead = inFromServer.read(serverReply)) != -1){
-//                    outToClient.write(serverReply, 0, byteRead);
-//                    outToClient.flush();
-//                }
-//
-//
-//            }catch (Exception e){
-//                e.printStackTrace();
-//            }
-
-            if (serverSocket != null){
-                serverSocket.close();
+            if(proxyToClientBw !=null){
+                proxyToClientBw.close();
             }
-            if(proxyToClientBufferedWriter != null){
-                proxyToClientBufferedWriter.close();
+
+
+            //send text files from cache
+
+
+        }catch (IOException e){
+            e.printStackTrace();
+            System.out.println("Error while sending cached image to client");
+        }
+    }
+
+    private void sendNonCachedToClient(String urlString) {
+        try{
+
+            //This allows the files on stored on disk to resemble that of the URL it was taken from
+            int fileExtensionIndex = urlString.lastIndexOf(".");
+            String fileExtension;
+
+            // Get the type of file
+            fileExtension = urlString.substring(fileExtensionIndex, urlString.length());
+
+            // Get the initial file name
+            String fileName = urlString.substring(0,fileExtensionIndex);
+
+
+            // Trim http://www.
+            fileName = fileName.substring(fileName.indexOf('.')+1);
+
+            // Remove any illegal characters
+            fileName = fileName.replace("/", "__");
+            fileName = fileName.replace('.','_');
+
+            // Trailing / result in index.html of that directory being fetched
+            if(fileExtension.contains("/")){
+                fileExtension = fileExtension.replace("/", "__");
+                fileExtension = fileExtension.replace('.','_');
+                fileExtension += ".html";
             }
-//            if(bufferedWriterFromProxyToServer != null){
-//                bufferedWriterFromProxyToServer.close();
-//            }
-//            if(bufferReaderFromServerToProxy != null){
-//                bufferReaderFromServerToProxy.close();
-//            }
+
+            fileName = fileName + fileExtension;
+
+            boolean caching = true;
+            File fileToCache = null;
+
+            BufferedWriter fileToCacheBw = null;
+
+            try{
+                fileToCache = new File("cached/" + fileName);
+
+                if(!fileToCache.exists()){
+                    fileToCache.createNewFile();
+                }
+
+                fileToCacheBw = new BufferedWriter(new FileWriter(fileToCache));
+            }catch (IOException e){
+                System.out.println("Couldn't cache: " + fileName);
+                caching =false;
+                e.printStackTrace();
+            }catch (NullPointerException e) {
+                System.out.println("Null Pointer Exception while opening the file");
+            }
+
+            //process if file is of image type
+            if ((fileExtension.contains(".png")) || (fileExtension.contains(".jpg")) ||
+                    (fileExtension.contains(".gif")) || (fileExtension.contains(".jpeg")) ||(fileExtension.contains(".ico"))){
+                try{
+                    URL remoteURL = new URL(urlString);
+
+                    BufferedImage image = ImageIO.read(remoteURL);
+
+                    if(image != null){
+                        ImageIO.write(image, fileExtension.substring(1), fileToCache);
+
+                        ImageIO.write(image, fileExtension.substring(1), fileToCache);
+                    }
+
+                }catch (Exception e){
+                    System.out.println("Couldn't read the image file");;
+                }
+            }
 
 
-        } catch (IOException e) {
+            else {
+                URL remoteURL = new URL(urlString);
+                HttpURLConnection proxyToRemoteCon = (HttpURLConnection) remoteURL.openConnection();
+                proxyToRemoteCon.setUseCaches(false);
+                proxyToRemoteCon.setDoOutput(true);
+
+                BufferedReader proxyToRemoteBR = new BufferedReader(new InputStreamReader(proxyToRemoteCon.getInputStream()));
+                String line;
+                while((line = proxyToRemoteBR.readLine()) != null){
+                    proxyToClientBw.write(line);
+
+                    if (caching){
+                        fileToCacheBw.write(line);
+                    }
+                }
+
+
+                proxyToClientBw.flush();
+
+                if(proxyToRemoteBR != null){
+                    proxyToRemoteBR.close();
+                }
+            }
+
+            if (caching){
+                fileToCacheBw.flush();
+                MultiThreadServer.addCachedPage(urlString, fileToCache);
+            }
+
+            if(fileToCacheBw != null){
+                fileToCacheBw.close();
+            }
+
+            if(proxyToClientBw != null){
+                proxyToClientBw.close();
+            }
+
+
+
+        }catch (Exception e){
             e.printStackTrace();
         }
 
-
-
     }
-
-
-    // Sends the cached content stored in the cache file to the client
-    private void sendCachedInfoToClient(String fileName) {
-
-        try {
-
-            byte[] bytes = Files.readAllBytes(Paths.get(fileName));
-
-            outToClient.write(bytes);
-            outToClient.flush();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        try {
-
-            if (clientSocket != null) {
-                clientSocket.close();
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-
-        }
-    }
-
-
-    // Generates a random file name
-    public String generateRandomFileName() {
-
-        String ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
-        SecureRandom RANDOM = new SecureRandom();
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < 10; ++i) {
-            sb.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
-        }
-        return sb.toString();
-    }
-
-    public String parseUrl(String line) {
-        System.out.println("Line: " + line);
-        Pattern p = Pattern.compile(Pattern.quote("GET ") + "(.*?)" + Pattern.quote(" HTTP/"));
-        Matcher m = p.matcher(line);
-
-        String url = "";
-
-        while (m.find()) {
-            url = m.group(1);
-        }
-
-        return url;
-    }
-
 }

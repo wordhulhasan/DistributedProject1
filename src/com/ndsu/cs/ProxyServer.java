@@ -1,85 +1,139 @@
 package com.ndsu.cs;
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.net.SocketException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Scanner;
 
-
-public class ProxyServer {
-
-    //cache is a Map: the key is the URL and the value is the file name of the file that stores the cached content
-    Map<String, String> cache;
-
-    ServerSocket proxySocket;
-
-    String logFileName = "log.txt";
+public class ProxyServer implements Runnable{
 
     public static void main(String[] args){
-        new ProxyServer().startServer(8081);
+        ProxyServer proxy = new ProxyServer(8081);
+        proxy.listen();
     }
 
-    void startServer(int proxyPort){
+    private ServerSocket serverSocket;
 
-        cache = new ConcurrentHashMap<>();
+    static HashMap<String, File> cache;
 
-        // create the directory to store cached files.
-        File cacheDir = new File("cached");
-        if (!cacheDir.exists() || (cacheDir.exists() && !cacheDir.isDirectory())) {
-            cacheDir.mkdirs();
+    static ArrayList<Thread> servicingThreads;
+
+
+    public ProxyServer(int port){
+        cache = new HashMap<>();
+        servicingThreads = new ArrayList<>();
+
+        new Thread(this).start();
+
+        try{
+            File cachedSites = new File("cachedSites.txt");
+            if(!cachedSites.exists()){
+                System.out.println("No cached site found, creating new file..");
+            }else{
+                FileInputStream fileInputStream = new FileInputStream(cachedSites);
+                ObjectInputStream  objectInputStream = new ObjectInputStream(fileInputStream);
+                cache = (HashMap<String, File>) objectInputStream.readObject();
+                fileInputStream.close();
+                objectInputStream.close();
+            }
+        }catch (IOException e){
+            System.out.println("Error Loading Previously cached sites file");
+            e.printStackTrace();
+        }catch (ClassNotFoundException e){
+            System.out.println("Class not found for previously loading cached sites file");
+            e.printStackTrace();
         }
 
-        /**
-         * To do:
-         * create a serverSocket to listen on the port (proxyPort)
-         * Create a thread (RequestHandler) for each new client connection
-         * remember to catch Exceptions!
-         *
-         */
-        ExecutorService executor = null;
-        try {
-            executor = Executors.newFixedThreadPool(5);
+        try{
+            serverSocket = new ServerSocket(8081);
 
-            System.out.println("Waiting for clients..");
-            while(true){
-                proxySocket = new ServerSocket(proxyPort);
-                Socket proxyClientSocket = proxySocket.accept();
-                Runnable worker = new RequestHandler(proxyClientSocket, new ProxyServer());
+            System.out.println("Waiting for client on port: "+serverSocket.getLocalPort()+"...");
 
-                executor.execute(worker);
+
+        }catch (IOException e){
+            System.out.println("Exception when connecting to the client");
+        }
+    }
+    private volatile boolean running = true;
+
+    private void listen() {
+        try{
+            while(running){
+                Socket socket = serverSocket.accept();
+
+                Thread thread = new Thread(new RequestHandler(socket));
+
+                servicingThreads.add(thread);
+                thread.start();
+            }
+        }catch (SocketException e){
+            System.out.println("Server is down");
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    private void closeServer() {
+        System.out.println("Closing the proxy server..");
+
+        running = false;
+
+        try{
+            FileOutputStream fileOut = new FileOutputStream("cachedSites.txt");
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOut);
+
+            objectOutputStream.writeObject(cache);
+            objectOutputStream.close();
+            fileOut.close();
+            System.out.println("Cached Sites written");
+
+            try{
+                System.out.println("Closing connection..");
+                serverSocket.close();
+            }catch (Exception e){
+                e.printStackTrace();
             }
 
         }catch (IOException e){
-            System.out.println("Exception caught when trying" +
-                    "to listen o port or listening for a connection!");
+            e.printStackTrace();
         }
     }
 
-    public String getCache(String hashcode) {
-        return cache.get(hashcode);
+    public static void addCachedPage(String urlString, File fileToCache){
+        cache.put(urlString, fileToCache);
     }
 
-    public void putCache(String hashcode, String fileName) {
-        cache.put(hashcode, fileName);
+    public static File getCachedPage(String url){
+        return cache.get(url);
     }
 
-    public synchronized void writeLog(String info) {
-
-        /**
-         * To do
-         * write string (info) to the log file, and add the current time stamp
-         * e.g. String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
-         *
-         */
+    @Override
+    public void run() {
+//        Scanner scanner = new Scanner(System.in);
+//
+//        String command;
+//        while(running){
+//            System.out.println("Enter new site to block, or type \"blocked\" to see blocked sites, \"cached\" to see cached sites, or \"close\" to close server.");
+//            command = scanner.nextLine();
+//
+//
+//            if(command.toLowerCase().equals("cached")){
+//                System.out.println("\nCurrently Cached Sites");
+//                for(String key : cache.keySet()){
+//                    System.out.println(key);
+//                }
+//                System.out.println();
+//            }
+//
+//
+//            else if(command.equals("close")){
+//                running = false;
+//                closeServer();
+//            }
+//
+//        }
+//        scanner.close();
     }
-
 }

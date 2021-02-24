@@ -142,4 +142,15 @@ public class MultiThreadServer implements Runnable{
 //        }
 //        scanner.close();
     }
+
+    //TODO: Wordh Codes
+    public synchronized void writeLog(String info) {
+
+        /**
+         * To do
+         * write string (info) to the log file, and add the current time stamp
+         * e.g. String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+         *
+         */
+    }
 }

@@ -3,14 +3,17 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
-import java.util.Scanner;
 
-public class MultiThreadServer implements Runnable{
+public class ProxyServer implements Runnable{
+
+    String logFileName = "log.txt";
 
     public static void main(String[] args){
-        MultiThreadServer proxy = new MultiThreadServer(8081);
+        ProxyServer proxy = new ProxyServer(Integer.parseInt(args[0]));
         proxy.listen();
     }
 
@@ -20,8 +23,12 @@ public class MultiThreadServer implements Runnable{
 
     static ArrayList<Thread> servicingThreads;
 
+    FileWriter writer;
 
-    public MultiThreadServer(int port){
+    BufferedWriter bufferedWriter;
+
+
+    public ProxyServer(int port){
         cache = new HashMap<>();
         servicingThreads = new ArrayList<>();
 
@@ -63,39 +70,13 @@ public class MultiThreadServer implements Runnable{
             while(running){
                 Socket socket = serverSocket.accept();
 
-                Thread thread = new Thread(new RequestHandler(socket));
+                Thread thread = new Thread(new RequestHandler(socket, this));
 
                 servicingThreads.add(thread);
                 thread.start();
             }
         }catch (SocketException e){
             System.out.println("Server is down");
-        }catch (IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    private void closeServer() {
-        System.out.println("Closing the proxy server..");
-
-        running = false;
-
-        try{
-            FileOutputStream fileOut = new FileOutputStream("cachedSites.txt");
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOut);
-
-            objectOutputStream.writeObject(cache);
-            objectOutputStream.close();
-            fileOut.close();
-            System.out.println("Cached Sites written");
-
-            try{
-                System.out.println("Closing connection..");
-                serverSocket.close();
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-
         }catch (IOException e){
             e.printStackTrace();
         }
@@ -115,36 +96,18 @@ public class MultiThreadServer implements Runnable{
         return file;
     }
 
+    //This is a function which looks redundant but is not. This class implements Runnable and so overrides the run()
+    // method of the class Runnable. If our project had requirements such that we had to use this function, we would
+    //have used it. For example, this method could have been used for reading input from console continuously and provide
+    //input to the program to execute tasks like closeServer(), etc. We could have written some helper class where
+    //we would have written some functions like closeServer() which is very specific to the console management or program
+    //management of the code.
     @Override
     public void run() {
-//        Scanner scanner = new Scanner(System.in);
-//
-//        String command;
-//        while(running){
-//            System.out.println("Enter new site to block, or type \"blocked\" to see blocked sites, \"cached\" to see cached sites, or \"close\" to close server.");
-//            command = scanner.nextLine();
-//
-//
-//            if(command.toLowerCase().equals("cached")){
-//                System.out.println("\nCurrently Cached Sites");
-//                for(String key : cache.keySet()){
-//                    System.out.println(key);
-//                }
-//                System.out.println();
-//            }
-//
-//
-//            else if(command.equals("close")){
-//                running = false;
-//                closeServer();
-//            }
-//
-//        }
-//        scanner.close();
+
     }
 
-    //TODO: Wordh Codes
-    public synchronized void writeLog(String info) {
+    public synchronized void writeLog(String info) throws IOException {
 
         /**
          * To do
@@ -152,5 +115,12 @@ public class MultiThreadServer implements Runnable{
          * e.g. String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
          *
          */
+        String timeStamp = new SimpleDateFormat("MMM dd yyyy HH:mm:ss z").format(new Date());
+        System.out.println(timeStamp+ " "+info);
+        writer = new FileWriter(logFileName, true);
+        bufferedWriter = new BufferedWriter(writer);
+        bufferedWriter.write(timeStamp+" "+info.substring(0,info.length()-9));
+        bufferedWriter.newLine();
+        bufferedWriter.close();
     }
 }

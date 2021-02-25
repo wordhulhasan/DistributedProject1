@@ -15,10 +15,11 @@ public class RequestHandler implements Runnable{
 
     BufferedWriter proxyToClientBw;
 
-    private Thread httpClientToServer;
+    ProxyServer server;
 
-    public RequestHandler(Socket clientSocket){
+    public RequestHandler(Socket clientSocket, ProxyServer server){
         this.clientSocket = clientSocket;
+        this.server = server;
 
         try{
             this.clientSocket.setSoTimeout(5000);
@@ -32,6 +33,8 @@ public class RequestHandler implements Runnable{
     @Override
     public void run() {
 
+
+        /* (1) Check the request type, only process GET request and ignore others */
         String requestString;
 
         try {
@@ -40,6 +43,12 @@ public class RequestHandler implements Runnable{
             e.printStackTrace();
             System.out.println("Error in reading request from the client");
             return;
+        }
+
+        try {
+            server.writeLog(clientSocket.getInetAddress().getHostAddress()+ " "+requestString.substring(4));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         //parse URL
@@ -58,18 +67,17 @@ public class RequestHandler implements Runnable{
             String temp = "http://";
             urlString = temp + urlString;
         }
-        // Check request type
-        if(request.equals("CONNECT")){
-            System.out.println("HTTPS Request for : " + urlString + "\n");
-//            handleHTTPSRequest(urlString);
-        }
 
-        else{
+        if(request.equals("GET")){
             // Check if we have a cached copy
             File file;
-            if((file = MultiThreadServer.getCachedPage(urlString)) != null){
+
+            /* (2) If the url of GET request has been cached, respond with cached content*/
+            if((file = ProxyServer.getCachedPage(urlString)) != null){
                 System.out.println("Cached Copy found for : " + urlString + "\n");
                 sendCachedPageToClient(file);
+            /* (3) Otherwise, call method proxyServertoClient to process the GET request
+           */
             } else {
                 System.out.println("HTTP GET for : " + urlString + "\n");
                 sendNonCachedToClient(urlString);
@@ -194,6 +202,8 @@ public class RequestHandler implements Runnable{
 
 
             else {
+                /* (1) Create a socket to connect to the web server (default port 80): Here, we have used a different approach.
+                * We used HttpURLConnection to connect the proxy to the remote server. */
                 URL remoteURL = new URL(urlString);
                 HttpURLConnection proxyToRemoteCon = (HttpURLConnection) remoteURL.openConnection();
                 proxyToRemoteCon.setUseCaches(false);
@@ -201,9 +211,10 @@ public class RequestHandler implements Runnable{
 
                 BufferedReader proxyToRemoteBR = new BufferedReader(new InputStreamReader(proxyToRemoteCon.getInputStream()));
                 String line;
+                /*(2) Send client's request (clientRequest) to the web server, you may want to use flush() after writing.*/
+                /* (3) Use a while loop to read all responses from web server and send back to client */
                 while((line = proxyToRemoteBR.readLine()) != null){
                     proxyToClientBw.write(line);
-
                     if (caching){
                         fileToCacheBw.write(line);
                     }
@@ -219,9 +230,11 @@ public class RequestHandler implements Runnable{
 
             if (caching){
                 fileToCacheBw.flush();
-                MultiThreadServer.addCachedPage(urlString, fileToCache);
+                /* (4) Write the web server's response to a cache file, put the request URL and cache file name to the cache Map */
+                ProxyServer.addCachedPage(urlString, fileToCache);
             }
 
+            /* (5) close file, and sockets. */
             if(fileToCacheBw != null){
                 fileToCacheBw.close();
             }

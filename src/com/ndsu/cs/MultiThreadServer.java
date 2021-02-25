@@ -3,13 +3,16 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Scanner;
 
 public class MultiThreadServer implements Runnable{
+    String logFileName = "log.txt";
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws IOException {
         MultiThreadServer proxy = new MultiThreadServer(8081);
         proxy.listen();
     }
@@ -19,12 +22,11 @@ public class MultiThreadServer implements Runnable{
     static HashMap<String, File> cache;
 
     static ArrayList<Thread> servicingThreads;
-
-
-    public MultiThreadServer(int port){
+    FileWriter writer;
+    BufferedWriter bufferedWriter;
+    public MultiThreadServer(int port) throws IOException {
         cache = new HashMap<>();
         servicingThreads = new ArrayList<>();
-
         new Thread(this).start();
 
         try{
@@ -63,7 +65,7 @@ public class MultiThreadServer implements Runnable{
             while(running){
                 Socket socket = serverSocket.accept();
 
-                Thread thread = new Thread(new RequestHandler(socket));
+                Thread thread = new Thread(new RequestHandler(socket, this));
 
                 servicingThreads.add(thread);
                 thread.start();
@@ -144,7 +146,7 @@ public class MultiThreadServer implements Runnable{
     }
 
     //TODO: Wordh Codes
-    public synchronized void writeLog(String info) {
+    public synchronized void writeLog(String info) throws IOException {
 
         /**
          * To do
@@ -152,5 +154,13 @@ public class MultiThreadServer implements Runnable{
          * e.g. String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
          *
          */
+        String timeStamp = new SimpleDateFormat("MMM dd yyyy HH:mm:ss z").format(new Date());
+        System.out.println(timeStamp+ " "+info);
+        writer = new FileWriter(logFileName, true);
+        bufferedWriter = new BufferedWriter(writer);
+        bufferedWriter.write(timeStamp+" "+info.substring(0,info.length()-9));
+        bufferedWriter.newLine();
+        bufferedWriter.close();
+
     }
 }

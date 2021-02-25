@@ -15,11 +15,13 @@ public class RequestHandler implements Runnable{
 
     BufferedWriter proxyToClientBw;
 
+    MultiThreadServer multiThreadServer;
+
     private Thread httpClientToServer;
 
-    public RequestHandler(Socket clientSocket){
+    public RequestHandler(Socket clientSocket, MultiThreadServer multiThreadServer){
         this.clientSocket = clientSocket;
-
+        this.multiThreadServer = multiThreadServer;
         try{
             this.clientSocket.setSoTimeout(5000);
             proxyToClientBr = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -41,7 +43,11 @@ public class RequestHandler implements Runnable{
             System.out.println("Error in reading request from the client");
             return;
         }
-
+        try {
+            multiThreadServer.writeLog(clientSocket.getInetAddress().getHostAddress()+ " "+requestString.substring(4));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         //parse URL
         System.out.println("The received request is: "+ requestString);
 

@@ -7,7 +7,15 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+/*
+References:
+1. https://github.com/stefano-lupo/Java-Proxy-Server
+2. http://www.jcgonzalez.com/java-simple-proxy-socket-server-examples
 
+ * @author  Arafat Bin Hossain
+ * @author Wordh Ul Hasan
+ * @version 1.0
+ */
 public class ProxyServer implements Runnable{
 
     String logFileName = "log.txt";

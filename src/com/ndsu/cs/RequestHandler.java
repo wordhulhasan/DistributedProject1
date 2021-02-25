@@ -7,6 +7,17 @@ import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.URL;
 
+/*
+References:
+1. https://github.com/stefano-lupo/Java-Proxy-Server
+2. http://www.jcgonzalez.com/java-simple-proxy-socket-server-examples
+
+ * @author  Arafat Bin Hossain
+ * @author Wordh Ul Hasan
+ * @version 1.0
+ */
+
+
 public class RequestHandler implements Runnable{
 
     Socket clientSocket;

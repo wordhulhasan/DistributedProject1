@@ -34,6 +34,13 @@ public class ProxyServer implements Runnable{
 
         new Thread(this).start();
 
+        //create directory to store cached files
+        // create the directory to store cached files.
+        File cacheDir = new File("cached");
+        if (!cacheDir.exists() || (cacheDir.exists() && !cacheDir.isDirectory())) {
+            cacheDir.mkdirs();
+        }
+
         try{
             File cachedSites = new File("cachedSites.txt");
             if(!cachedSites.exists()){
